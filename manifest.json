@@ -1,0 +1,15 @@
+{
+  "name": "智记背单词",
+  "short_name": "智记背单词",
+  "description": "基于艾宾浩斯 + 链式回顾的本地背单词应用",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7F8FA",
+  "theme_color": "#4A90D9",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

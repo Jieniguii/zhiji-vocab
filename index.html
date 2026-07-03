@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>智记背单词</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#4A90D9" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="智记背单词" />
+</head>
+<body>
+  <div id="app">
+    <!-- 首页 -->
+    <section id="screen-home" class="screen active">
+      <header class="topbar">
+        <span class="brand">智记背单词</span>
+        <span id="home-date" class="date"></span>
+      </header>
+      <div id="home-body" class="body"></div>
+    </section>
+
+    <!-- 学新 / 复习（共用） -->
+    <section id="screen-learn" class="screen">
+      <header class="topbar">
+        <button id="learn-back" class="iconbtn">←</button>
+        <span id="learn-title">学新</span>
+        <span id="learn-progress" class="progress">组 1/1</span>
+      </header>
+      <div id="learn-body" class="body"></div>
+    </section>
+
+    <!-- 今日总结 -->
+    <section id="screen-summary" class="screen">
+      <header class="topbar"><span class="brand">今日总结</span></header>
+      <div id="summary-body" class="body"></div>
+    </section>
+
+    <!-- 已学单词 -->
+    <section id="screen-learned" class="screen">
+      <header class="topbar">
+        <button id="learned-back" class="iconbtn">←</button>
+        <span class="brand">已学单词</span>
+        <span></span>
+      </header>
+      <div id="learned-body" class="body"></div>
+    </section>
+
+    <!-- 统计 / 学习日历 -->
+    <section id="screen-stats" class="screen">
+      <header class="topbar">
+        <button id="stats-back" class="iconbtn">←</button>
+        <span class="brand">统计 / 日历</span>
+        <span></span>
+      </header>
+      <div id="stats-body" class="body"></div>
+    </section>
+
+    <!-- 设置 -->
+    <section id="screen-settings" class="screen">
+      <header class="topbar"><span class="brand">设置 / 备份</span></header>
+      <div id="settings-body" class="body"></div>
+    </section>
+  </div>
+
+  <!-- 词库（用 script 引入，绕开 file:// 下 fetch 限制） -->
+  <script src="data/cet6.js"></script>
+  <script src="data/daily.js"></script>
+  <script src="data/tech.js"></script>
+  <script src="data/jp.js"></script>
+  <!-- 逻辑 -->
+  <script src="js/speech.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/srs.js"></script>
+  <script src="js/study.js"></script>
+  <script src="js/review.js"></script>
+  <script src="js/quickflip.js"></script>
+  <script src="js/app.js"></script>
+  <!-- 注册 Service Worker（仅在 http/https 下，file:// 和 Electron 里自动跳过） -->
+  <script>
+    if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>
