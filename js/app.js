@@ -60,6 +60,12 @@
       ).join('');
 
       const jaNoVoice = bank.lang === 'ja' && window.Speech && !Speech.hasVoiceFor('ja');
+      const jaHasAudio = !!(window.JA_AUDIO && Object.keys(window.JA_AUDIO).length);
+      const jaTip = jaNoVoice
+        ? (jaHasAudio
+          ? '🔊 已启用内置日语发音（覆盖 N5/N4 基础词）；N3–N1 暂无发音。'
+          : '⚠️ 未检测到日语语音，日语发音已暂停。<br>装法：Windows 设置 → 时间和语言 → 语音 → 管理语音 → 添加“日语”，装好后重启本应用。')
+        : '';
 
       const el = document.getElementById('home-body');
       el.innerHTML = `
@@ -69,7 +75,7 @@
             <select id="bank-select">${bankOptions}</select>
           </div>
           <div class="hc-sub">本词库已学 ${bankLearned} / ${bank.arr.length} 词</div>
-          ${jaNoVoice ? `<div class="warn-tip">⚠️ 未检测到日语语音，日语发音已暂停。<br>装法：Windows 设置 → 时间和语言 → 语音 → 管理语音 → 添加“日语”，装好后重启本应用。</div>` : ''}
+          ${jaTip ? `<div class="warn-tip">${jaTip}</div>` : ''}
         </div>
 
         <div class="card home-card">

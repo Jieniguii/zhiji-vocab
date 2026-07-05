@@ -44,6 +44,29 @@
       return !!this.voiceForBase(base);
     },
 
+    // ---- 日语内置音频兜底（系统无日语语音时用预生成的 mp3）----
+    wordHash(s) { // 与 tools_gen_ja_audio.js 保持一致（djb2 + fnv1a 双哈希，36进制）
+      let h1 = 5381, h2 = 2166136261;
+      for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        h1 = ((h1 << 5) + h1 + c) >>> 0;
+        h2 = ((h2 ^ c) * 16777619) >>> 0;
+      }
+      return h1.toString(36) + h2.toString(36);
+    },
+    hasJaAudio(word) {
+      return !!(window.JA_AUDIO && window.JA_AUDIO[this.wordHash(word)]);
+    },
+    playJaAudio(word) {
+      if (!this.hasJaAudio(word)) return false;
+      try {
+        if (this._audio) { this._audio.pause(); }
+        this._audio = new Audio('audio/ja/h' + this.wordHash(word) + '.mp3');
+        this._audio.play().catch(function () {});
+        return true;
+      } catch (e) { return false; }
+    },
+
     // 朗读单词/句子（自动识别中英日语言）
     speak(text, opts) {
       if (!this.supported() || !text) return;
@@ -52,8 +75,11 @@
         let langCode, voice;
         if (this.detectLang(text) === 'ja') {
           voice = this.voiceForBase('ja');
-          // 没装日语语音时宁可不发声，也不要用中文嗓音把汉字读成中文
-          if (!voice) return;
+          if (!voice) {
+            // 没装日语语音：先试内置音频；再不行宁可不发声，也不用中文嗓音乱读
+            this.playJaAudio(text);
+            return;
+          }
           langCode = 'ja-JP';
         } else {
           const accent = (window.Store && Store.settings.accent) || 'us';
@@ -81,6 +107,7 @@
 
     cancel() {
       if (this.supported()) window.speechSynthesis.cancel();
+      if (this._audio) { try { this._audio.pause(); } catch (e) {} this._audio = null; }
     }
   };
 
