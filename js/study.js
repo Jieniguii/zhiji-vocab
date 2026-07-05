@@ -289,7 +289,7 @@
       if (this.ci >= this.chain.length) {
         // 本词的回顾结束
         if (this.learnedCount >= this.group.length) {
-          this.renderGroupSummary();
+          this.startSweep(); // 全组学完 → 三遍扫读 → 听音想义 → 组内总结
         } else {
           this.phase = 'learn';
           this.step = 'show';
@@ -303,8 +303,99 @@
       }
     },
 
+    // ---------- 全组三遍扫读：下→上→下，走到哪个高亮+朗读 ----------
+    startSweep() {
+      const n = this.group.length;
+      const down = Array.from({ length: n }, (_, i) => i);
+      const up = down.slice().reverse();
+      this.sweepSeq = down.concat(up, down); // 三遍
+      this.si = 0;
+      this.phase = 'sweep';
+      this.renderSweep();
+    },
+
+    renderSweep() {
+      clearTimeout(this.sweepTimer);
+      if (this.si >= this.sweepSeq.length) { this.startListen(); return; }
+      this.progressBar();
+      const pos = this.sweepSeq[this.si];
+      const n = this.group.length;
+      const pass = Math.floor(this.si / n) + 1;
+      Speech.cancel();
+      Speech.speak(this.group[pos].word);
+
+      const body = document.getElementById('learn-body');
+      body.innerHTML = `
+        <div class="content">
+          <div class="badge-chain">📖 全组再背 第 ${pass}/3 遍（${pass === 2 ? '从下往上' : '从上往下'}）</div>
+          <div class="word-list">${this.wordListHtml(pos, true, false)}</div>
+        </div>
+        <div class="action-bar">
+          <div class="hint">跟着高亮，读出【英文 + 中文】</div>
+          <div class="controls">
+            <button class="btn primary block" data-act="swNext">继续 →</button>
+            <button class="btn tiny ghost" data-act="swSkip">跳过此环节</button>
+          </div>
+        </div>`;
+      body.querySelector('[data-act="swNext"]').onclick = () => { this.si++; this.renderSweep(); };
+      body.querySelector('[data-act="swSkip"]').onclick = () => { clearTimeout(this.sweepTimer); this.startListen(); };
+      // 自动前进（读完稍停）；也可点"继续"手动加速
+      this.sweepTimer = setTimeout(() => { this.si++; this.renderSweep(); }, 2000);
+    },
+
+    // ---------- 听音想义：只放发音，想单词+意思 ----------
+    startListen() {
+      clearTimeout(this.sweepTimer);
+      this.li = 0;
+      this.listenRevealed = false;
+      this.phase = 'listen';
+      this.renderListen();
+    },
+
+    renderListen() {
+      if (this.li >= this.group.length) { this.renderGroupSummary(); return; }
+      this.progressBar();
+      const w = this.group[this.li];
+      if (!this.listenRevealed) { Speech.cancel(); Speech.speak(w.word); }
+
+      const body = document.getElementById('learn-body');
+      const card = this.listenRevealed
+        ? `<div class="card" id="word-card">
+             <div class="word">${w.word}</div>
+             <div class="phonetic">${w.phonetic ? '/' + w.phonetic + '/' : ''}</div>
+             <div class="meaning"><div class="mean-cn">${w.meaning}</div></div>
+           </div>`
+        : `<div class="card" id="word-card">
+             <div class="word">🎧</div>
+             <div class="phonetic">听发音，想出【单词 + 意思】</div>
+           </div>`;
+
+      body.innerHTML = `
+        <div class="content">
+          <div class="badge-chain">🎧 听音想义 ${this.li + 1}/${this.group.length}</div>
+          ${card}
+        </div>
+        <div class="action-bar">
+          <div class="controls">
+            ${this.listenRevealed
+              ? `<button class="btn primary block" data-act="lsNext">下一个 →</button>`
+              : `<div class="judge">
+                   <button class="btn ghost" data-act="lsReplay">🔊 再听</button>
+                   <button class="btn primary" data-act="lsShow">显示答案 →</button>
+                 </div>`}
+            <button class="btn tiny ghost" data-act="lsSkip">跳过此环节</button>
+          </div>
+        </div>`;
+      const q = a => body.querySelector('[data-act="' + a + '"]');
+      if (q('lsReplay')) q('lsReplay').onclick = () => Speech.speak(w.word);
+      if (q('lsShow')) q('lsShow').onclick = () => { this.listenRevealed = true; this.renderListen(); };
+      if (q('lsNext')) q('lsNext').onclick = () => { this.li++; this.listenRevealed = false; this.renderListen(); };
+      q('lsSkip').onclick = () => this.renderGroupSummary();
+    },
+
     // ---------- 组内总结 ----------
     renderGroupSummary() {
+      clearTimeout(this.sweepTimer);
       Speech.cancel();
       const body = document.getElementById('learn-body');
       const rows = this.group.map(w => {
@@ -334,6 +425,7 @@
     },
 
     finish() {
+      clearTimeout(this.sweepTimer);
       Speech.cancel();
       this.onDone(this.results);
     },
