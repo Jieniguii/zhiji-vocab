@@ -36,6 +36,7 @@
       return this.voiceForBase(base);
     },
     voiceForBase(base) {
+      if (!this.supported()) return null;
       if (!this.voices.length) this.voices = window.speechSynthesis.getVoices() || [];
       return this.voices.find(x => (x.lang || '').replace('_', '-').toLowerCase().startsWith(base)) || null;
     },
@@ -54,40 +55,50 @@
       }
       return h1.toString(36) + h2.toString(36);
     },
-    hasJaAudio(word) {
-      return !!(window.JA_AUDIO && window.JA_AUDIO[this.wordHash(word)]);
+    // 内置音频清单：ja → window.JA_AUDIO，en → window.EN_AUDIO
+    audioManifest(base) {
+      return base === 'ja' ? window.JA_AUDIO : window.EN_AUDIO;
     },
-    playJaAudio(word) {
-      if (!this.hasJaAudio(word)) return false;
+    hasBundled(base, word) {
+      const m = this.audioManifest(base);
+      return !!(m && m[this.wordHash(word)]);
+    },
+    playBundled(base, word) {
+      if (!this.hasBundled(base, word)) return false;
       try {
         if (this._audio) { this._audio.pause(); }
-        this._audio = new Audio('audio/ja/h' + this.wordHash(word) + '.mp3');
+        this._audio = new Audio('audio/' + base + '/h' + this.wordHash(word) + '.mp3');
         this._audio.play().catch(function () {});
         return true;
       } catch (e) { return false; }
     },
+    // 兼容旧调用
+    hasJaAudio(word) { return this.hasBundled('ja', word); },
+    playJaAudio(word) { return this.playBundled('ja', word); },
 
-    // 朗读单词/句子（自动识别中英日语言）
+    // 朗读单词/句子（自动识别中英日）：系统语音优先 → 内置音频兜底 → 静默
+    // 注意：安卓 WebView（打包成 App 后）没有 speechSynthesis，全靠内置音频
     speak(text, opts) {
-      if (!this.supported() || !text) return;
+      if (!text) return;
       opts = opts || {};
       try {
+        const base = this.detectLang(text);
         let langCode, voice;
-        if (this.detectLang(text) === 'ja') {
+        if (base === 'ja') {
           voice = this.voiceForBase('ja');
-          if (!voice) {
-            // 没装日语语音：先试内置音频；再不行宁可不发声，也不用中文嗓音乱读
-            this.playJaAudio(text);
-            return;
-          }
           langCode = 'ja-JP';
         } else {
           const accent = (window.Store && Store.settings.accent) || 'us';
           langCode = accent === 'uk' ? 'en-GB' : 'en-US';
           voice = this.pickVoiceFor(langCode);
         }
+        if (!voice) {
+          // 没有该语言的系统语音（或根本没有语音接口）→ 内置音频；再不行静默
+          this.playBundled(base, text);
+          return;
+        }
         const u = new SpeechSynthesisUtterance(text);
-        if (voice) u.voice = voice;
+        u.voice = voice;
         u.lang = langCode;
         u.rate = opts.rate || 0.9;
         u.pitch = 1;
@@ -99,8 +110,7 @@
 
     // 读单词两遍（学新时用）
     speakWordTwice(word) {
-      if (!this.supported()) return;
-      window.speechSynthesis.cancel();
+      if (this.supported()) window.speechSynthesis.cancel();
       this.speak(word, { rate: 0.85 });
       setTimeout(() => this.speak(word, { rate: 0.8 }), 900);
     },
