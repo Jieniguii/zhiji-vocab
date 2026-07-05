@@ -1,5 +1,5 @@
 // Service Worker：缓存全部资源，实现离线可用（PWA）
-const CACHE = 'zhiji-v7';
+const CACHE = 'zhiji-v8';
 const ASSETS = [
   './', './index.html', './manifest.json',
   './css/style.css',
