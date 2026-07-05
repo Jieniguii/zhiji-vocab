@@ -353,7 +353,7 @@
     },
 
     renderListen() {
-      if (this.li >= this.group.length) { this.renderGroupSummary(); return; }
+      if (this.li >= this.group.length) { this.startGroupReview(); return; }
       this.progressBar();
       const w = this.group[this.li];
       if (!this.listenRevealed) { Speech.cancel(); Speech.speak(w.word); }
@@ -390,7 +390,56 @@
       if (q('lsReplay')) q('lsReplay').onclick = () => Speech.speak(w.word);
       if (q('lsShow')) q('lsShow').onclick = () => { this.listenRevealed = true; this.renderListen(); };
       if (q('lsNext')) q('lsNext').onclick = () => { this.li++; this.listenRevealed = false; this.renderListen(); };
-      q('lsSkip').onclick = () => this.renderGroupSummary();
+      q('lsSkip').onclick = () => this.startGroupReview();
+    },
+
+    // ---------- 组间回顾：学完第N组，回顾第N-1组+第N组 ----------
+    startGroupReview() {
+      const prev = this.gi > 0 ? this.groups[this.gi - 1] : [];
+      this.grWords = prev.concat(this.group);
+      this.grLabel = this.gi > 0 ? `第${this.gi}·${this.gi + 1}组` : '第1组';
+      this.gri = 0;
+      this.grRevealed = false;
+      this.phase = 'greview';
+      this.renderGroupReview();
+    },
+
+    renderGroupReview() {
+      if (this.gri >= this.grWords.length) { this.renderGroupSummary(); return; }
+      this.progressBar();
+      const w = this.grWords[this.gri];
+      if (!this.grRevealed) { Speech.cancel(); Speech.speak(w.word); }
+
+      const body = document.getElementById('learn-body');
+      body.innerHTML = `
+        <div class="content">
+          <div class="badge-chain">🔁 组间回顾（${this.grLabel}）${this.gri + 1}/${this.grWords.length}</div>
+          <div class="card" id="word-card">
+            <div class="word">${w.word}</div>
+            <div class="phonetic">${w.phonetic ? '/' + w.phonetic + '/' : ''}
+              ${w.tier ? `<span class="tier-badge ${TIER_CLASS[w.tier]}">${TIER_LABEL[w.tier]}</span>` : ''}</div>
+            <div class="meaning ${this.grRevealed ? '' : 'hidden'}">
+              <div class="mean-cn">${w.meaning}</div>
+            </div>
+          </div>
+        </div>
+        <div class="action-bar">
+          <div class="hint">${this.grRevealed ? '看一遍加深印象' : '快速说出【英文 + 中文】'}</div>
+          <div class="controls">
+            ${this.grRevealed
+              ? `<button class="btn primary block" data-act="grNext">继续 →</button>`
+              : `<div class="judge">
+                   <button class="btn ok"  data-act="grKnown">✅ 记得</button>
+                   <button class="btn bad" data-act="grForgot">❌ 忘了</button>
+                 </div>`}
+            <button class="btn tiny ghost" data-act="grSkip">跳过此环节</button>
+          </div>
+        </div>`;
+      const q = a => body.querySelector('[data-act="' + a + '"]');
+      if (q('grKnown')) q('grKnown').onclick = () => { this.gri++; this.grRevealed = false; this.renderGroupReview(); };
+      if (q('grForgot')) q('grForgot').onclick = () => { this.grRevealed = true; Speech.speak(w.word, { rate: 0.85 }); this.renderGroupReview(); };
+      if (q('grNext')) q('grNext').onclick = () => { this.gri++; this.grRevealed = false; this.renderGroupReview(); };
+      q('grSkip').onclick = () => this.renderGroupSummary();
     },
 
     // ---------- 组内总结 ----------
