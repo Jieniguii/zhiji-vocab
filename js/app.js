@@ -148,86 +148,109 @@
         alert('这个词库的词都学过啦！可以换个词库，或去复习。');
         return;
       }
-      this._scr = { need: n, cands: cands, i: 0, picked: [], history: [] };
+      this._scr = { need: n, cands: cands, shown: Math.min(n, cands.length), known: {} };
       this.show('screen-learn');
       document.getElementById('learn-title').textContent = '选词';
       this.renderScreening();
     },
 
+    // 单行 HTML（默认"不会"待学；点行=发音+显中文；右键钮标"认识"→绿色高亮）
+    _scrRowHtml(w, i) {
+      const isK = this._scr.known[w.word];
+      return `<div class="lw-row scr-row ${isK ? 'known' : ''}" data-i="${i}">
+        <div class="lw-main">
+          <div class="lw-top">
+            <span class="lw-word">${w.word}</span>
+            <span class="qf-ph muted">${w.phonetic ? '/' + w.phonetic + '/' : ''}</span>
+            ${w.tier ? `<span class="tier-badge ${TIER_CLASS[w.tier]}">${TIER_LABEL[w.tier]}</span>` : ''}
+          </div>
+          <div class="lw-mean muted hidden">${(w.meaning || '').replace(/\n/g, ' / ')}</div>
+        </div>
+        <button class="scr-mark ${isK ? 'known' : ''}" data-k="${i}">${isK ? '认识' : '不会'}</button>
+      </div>`;
+    },
+
+    _scrBind(row) {
+      const s = this._scr;
+      const i = +row.dataset.i;
+      const w = s.cands[i];
+      row.onclick = () => {
+        const m = row.querySelector('.lw-mean');
+        if (m) m.classList.toggle('hidden');
+        Speech.speak(w.word);
+      };
+      const btn = row.querySelector('.scr-mark');
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const now = !s.known[w.word];
+        if (now) s.known[w.word] = true; else delete s.known[w.word];
+        row.classList.toggle('known', now);
+        btn.classList.toggle('known', now);
+        btn.textContent = now ? '认识' : '不会';
+        // 标了认识导致待学不足 → 自动在底部补一行新候选
+        if (now && this._scrUnknown() < s.need && s.shown < s.cands.length) {
+          const list = document.querySelector('#learn-body .lw-list');
+          list.insertAdjacentHTML('beforeend', this._scrRowHtml(s.cands[s.shown], s.shown));
+          s.shown++;
+          this._scrBind(list.lastElementChild);
+        }
+        this._scrFoot();
+      };
+    },
+
+    _scrUnknown() {
+      const s = this._scr;
+      return s.cands.slice(0, s.shown).filter(w => !s.known[w.word]).length;
+    },
+
+    _scrFoot() {
+      const s = this._scr;
+      const un = this._scrUnknown();
+      const n = Math.min(un, s.need);
+      document.getElementById('learn-progress').textContent = `待学 ${un}/${s.need}`;
+      const btn = document.querySelector('[data-act="scrGo"]');
+      if (btn) {
+        btn.disabled = n === 0;
+        btn.textContent = n ? `开始背 (${n}) →` : '先选出要学的词';
+      }
+    },
+
     renderScreening() {
       const s = this._scr;
-      if (s.picked.length >= s.need || s.i >= s.cands.length) { this.finishScreening(); return; }
-      const w = s.cands[s.i];
-      Speech.cancel();
-      Speech.speak(w.word);
-      document.getElementById('learn-progress').textContent = `已选 ${s.picked.length}/${s.need}`;
-
+      const rows = s.cands.slice(0, s.shown).map((w, i) => this._scrRowHtml(w, i)).join('');
       const body = document.getElementById('learn-body');
       body.innerHTML = `
-        <div class="content">
-          <div class="badge-chain">🔍 选词：认识的划走，不认识的入选</div>
-          <div class="card" id="word-card">
-            <div class="word">${w.word}</div>
-            <div class="phonetic">${w.phonetic ? '/' + w.phonetic + '/' : ''}
-              ${w.tier ? `<span class="tier-badge ${TIER_CLASS[w.tier]}">${TIER_LABEL[w.tier]}</span>` : ''}</div>
-            <div class="meaning hidden">
-              <div class="mean-cn">${w.meaning}</div>
-            </div>
-          </div>
+        <div class="content summary">
+          <div class="qf-tip muted">🔍 选词：点单词听发音/看中文；认识的点右边标绿，不会的留着背</div>
+          <div class="lw-list">${rows}</div>
         </div>
         <div class="action-bar">
-          <div class="hint">这个词你认识吗？（点「认识」将标为已掌握，不再出现）</div>
-          <div class="controls">
-            <div class="judge">
-              <button class="btn ok"  data-act="scrKnow">✅ 认识，划走</button>
-              <button class="btn bad" data-act="scrPick">📥 不认识，要学</button>
-            </div>
-            <div class="sub-actions">
-              <button class="btn tiny ghost" data-act="scrPeek">👁 看释义</button>
-              ${s.history.length ? '<button class="btn tiny" data-act="scrUndo">↩ 上一个</button>' : ''}
-              ${s.picked.length ? `<button class="btn tiny ghost" data-act="scrGo">选够了，先学已选的 (${s.picked.length}) →</button>` : ''}
-            </div>
-          </div>
+          <div class="hint">「认识」的词会标为已掌握，以后不再出现</div>
+          <button class="btn primary block" data-act="scrGo">开始背 →</button>
         </div>`;
-
-      const q = a => body.querySelector('[data-act="' + a + '"]');
-      q('scrPeek').onclick = () => {
-        const m = body.querySelector('#word-card .meaning');
-        if (m) m.classList.toggle('hidden');
-      };
-      q('scrKnow').onclick = () => {
-        // 标为已掌握：不进学习，也不进复习队列
-        const rec = SRS.newRecord(w.word);
-        rec.level = SRS.MAX_LEVEL; rec.mastered = true; rec.nextReview = null;
-        rec.initialDifficulty = 'screened';
-        Store.put(rec);
-        s.history.push({ word: w.word, act: 'know' });
-        s.i++; this.renderScreening();
-      };
-      q('scrPick').onclick = () => {
-        s.picked.push(w);
-        s.history.push({ word: w.word, act: 'pick' });
-        s.i++; this.renderScreening();
-      };
-      if (q('scrUndo')) q('scrUndo').onclick = () => {
-        const last = s.history.pop();
-        if (!last) return;
-        if (last.act === 'know') { delete Store.records[last.word.toLowerCase()]; Store.saveRecords(); }
-        else s.picked.pop();
-        s.i--; this.renderScreening();
-      };
-      if (q('scrGo')) q('scrGo').onclick = () => this.finishScreening();
+      body.querySelectorAll('.scr-row').forEach(row => this._scrBind(row));
+      body.querySelector('[data-act="scrGo"]').onclick = () => this.finishScreening();
+      this._scrFoot();
     },
 
     finishScreening() {
       Speech.cancel();
       const s = this._scr;
-      if (!s.picked.length) {
-        alert('一个生词都没选出来——都认识就太强了！换个词库试试？');
+      const visible = s.cands.slice(0, s.shown);
+      // 标了认识的 → 已掌握入库
+      visible.filter(w => s.known[w.word]).forEach(w => {
+        const rec = SRS.newRecord(w.word);
+        rec.level = SRS.MAX_LEVEL; rec.mastered = true; rec.nextReview = null;
+        rec.initialDifficulty = 'screened';
+        Store.put(rec);
+      });
+      const unknown = visible.filter(w => !s.known[w.word]);
+      if (!unknown.length) {
+        alert('这批词你全认识——太强了！再开一批试试？');
         this.renderHome();
         return;
       }
-      this.beginStudy(s.picked);
+      this.beginStudy(unknown.slice(0, s.need));
     },
 
     // ---------------- 学新 ----------------
