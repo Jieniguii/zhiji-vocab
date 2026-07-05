@@ -117,6 +117,7 @@
           <button class="btn ghost" data-act="listen">🔊 再听</button>
           <button class="btn primary" data-act="toTest">关闭释义，自测 →</button>`;
       } else { // test
+        Speech.speak(w.word); // 自测时也读一遍，边听边回忆
         controls = `
           <div class="hint">${this.relearning ? '再测一次：' : ''}默读出【英文 + 中文】，再判定：</div>
           <div class="judge">

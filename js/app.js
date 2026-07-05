@@ -17,6 +17,10 @@
       Store.load();
       Speech.init();
       const W = window.WORDBANKS || {};
+      // 日语词库套用中文释义覆盖层（翻好的显示中文，其余暂用英文）
+      if (window.JP_ZH && W.jp) {
+        W.jp.forEach(w => { if (window.JP_ZH[w.word]) w.meaning = window.JP_ZH[w.word]; });
+      }
       // 挂上每个词库的数组
       Object.keys(this.banks).forEach(k => { this.banks[k].arr = W[this.banks[k].varName] || []; });
       // 复习查词用：合并所有词库的 word -> wordObj
